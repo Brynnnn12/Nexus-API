@@ -5,11 +5,12 @@ const {
 
 exports.findById = async (id) => {
   return await Post.findByPk(id, {
+    attributes: ["id", "content", "userId", "createdAt"],
     include: [
       {
         model: require("../../database/models").User,
         as: "user",
-        attributes: ["id", "name", "email"],
+        attributes: ["name"],
       },
     ],
   });
@@ -19,11 +20,12 @@ exports.findByUserId = async (userId, page = 1, limit = 10) => {
   const offset = (page - 1) * limit;
   const { count, rows } = await Post.findAndCountAll({
     where: { userId },
+    attributes: ["id", "content", "userId", "createdAt"],
     include: [
       {
         model: require("../../database/models").User,
         as: "user",
-        attributes: ["id", "name", "email"],
+        attributes: ["name"],
       },
     ],
     limit,
@@ -36,11 +38,12 @@ exports.findByUserId = async (userId, page = 1, limit = 10) => {
 exports.findAll = async (page = 1, limit = 10) => {
   const offset = (page - 1) * limit;
   const { count, rows } = await Post.findAndCountAll({
+    attributes: ["id", "content", "createdAt"],
     include: [
       {
         model: require("../../database/models").User,
         as: "user",
-        attributes: ["id", "name", "email"],
+        attributes: ["name", "email"],
       },
     ],
     limit,
@@ -61,4 +64,8 @@ exports.updateById = async (id, updateData) => {
 
 exports.deleteById = async (id) => {
   return await Post.destroy({ where: { id } });
+};
+
+exports.countByUserId = async (userId) => {
+  return await Post.count({ where: { userId } });
 };

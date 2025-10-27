@@ -2,6 +2,7 @@ const { Like } = require("../../database/models");
 
 exports.findLike = async (userId, postId) => {
   return await Like.findOne({
+    attributes: { exclude: ["createdAt", "updatedAt"] },
     where: { userId, postId },
   });
 };
@@ -18,12 +19,20 @@ exports.deleteLike = async (userId, postId) => {
 
 exports.getLikesByPost = async (postId) => {
   return await Like.findAll({
+    attributes: {
+      exclude: ["userId", "postId", "createdAt", "updatedAt"],
+    },
     where: { postId },
     include: [
       {
         model: require("../../database/models").User,
         as: "user",
-        attributes: ["id", "name", "email"],
+        attributes: ["name"],
+      },
+      {
+        model: require("../../database/models").Post,
+        as: "post",
+        attributes: ["content"],
       },
     ],
   });
@@ -37,7 +46,16 @@ exports.getLikesCount = async (postId) => {
 
 exports.getLikesByUser = async (userId) => {
   return await Like.findAll({
+    attributes: {
+      exclude: ["userId", "postId", "createdAt", "updatedAt"],
+    },
     where: { userId },
-    include: [{ model: require("../../database/models").Post, as: "post" }],
+    include: [
+      {
+        model: require("../../database/models").Post,
+        as: "post",
+        attributes: ["content"],
+      },
+    ],
   });
 };

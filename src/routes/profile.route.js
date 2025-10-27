@@ -9,16 +9,13 @@ const { updateProfileValidation } = require("../app/Requests/profile.request");
 
 const router = express.Router();
 
+// GET /profiles/me - Get own profile (authenticated)
+router.get("/me", authenticate, getProfile);
+
 // Public route - view user profile by ID
 router.get("/:id", getUserProfile);
 
-// Semua routes butuh auth
-router.use(authenticate);
-
-// GET /profiles/me - Get own profile
-router.get("/me", getProfile);
-
-// PUT /profiles - Update profile
-router.put("/", updateProfileValidation, updateProfile);
+// PUT /profiles - Update profile (authenticated)
+router.put("/", authenticate, updateProfileValidation, updateProfile);
 
 module.exports = router;

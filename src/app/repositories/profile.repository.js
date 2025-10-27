@@ -3,6 +3,7 @@ const { Profile, User } = require("../../database/models");
 exports.findByUserId = async (userId) => {
   return await Profile.findOne({
     where: { userId },
+    attributes: ["displayName", "bio"],
     include: [
       {
         model: User,

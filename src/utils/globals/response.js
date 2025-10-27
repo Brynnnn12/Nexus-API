@@ -7,10 +7,16 @@ exports.responseSuccess = (res, statusCode, data, message = "Success") => {
 };
 
 exports.responseError = (res, statusCode, error, message = "Error") => {
+  let errorDetail = error;
+  if (error instanceof Error) {
+    errorDetail = error.stack;
+  } else if (!error) {
+    errorDetail = message;
+  }
   return res.status(statusCode).json({
     status: "error",
     message,
-    error,
+    error: errorDetail,
   });
 };
 

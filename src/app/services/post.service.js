@@ -23,10 +23,11 @@ exports.createPost = async (userId, postData) => {
 exports.updatePost = async (id, userId, updateData) => {
   const post = await PostRepository.findById(id);
   if (!post) {
-    throw new Error("Post not found");
+    throw new Error("Postingan tidak ditemukan");
   }
+
   if (post.userId !== userId) {
-    throw new Error("Unauthorized to update this post");
+    throw new Error("Tidak diizinkan untuk memperbarui postingan ini");
   }
   const updated = await PostRepository.updateById(id, updateData);
   if (!updated) {
@@ -41,7 +42,7 @@ exports.deletePost = async (id, userId) => {
     throw new Error("Post not found");
   }
   if (post.userId !== userId) {
-    throw new Error("Unauthorized to delete this post");
+    throw new Error("Tidak diizinkan untuk menghapus postingan ini");
   }
   const deleted = await PostRepository.deleteById(id);
   if (!deleted) {
