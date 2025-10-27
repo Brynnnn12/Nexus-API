@@ -25,7 +25,6 @@ exports.getUserProfile = async (userId) => {
     throw new Error("Profile tidak ditemukan");
   }
 
-  // Get stats
   const followersCount = await FollowRepository.getFollowersCount(userId);
   const followingCount = await FollowRepository.getFollowingCount(userId);
   const postsCount = await PostRepository.countByUserId(userId);

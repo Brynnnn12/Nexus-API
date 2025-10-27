@@ -19,11 +19,14 @@ exports.deleteFollow = async (followerId, followingId) => {
 exports.getFollowers = async (userId) => {
   return await Follow.findAll({
     where: { followingId: userId },
+    attributes: {
+      exclude: ["followerId", "followingId", "createdAt", "updatedAt"],
+    },
     include: [
       {
         model: require("../../database/models").User,
         as: "follower",
-        attributes: ["id", "name", "email"],
+        attributes: ["name"],
       },
     ],
   });
@@ -32,11 +35,14 @@ exports.getFollowers = async (userId) => {
 exports.getFollowing = async (userId) => {
   return await Follow.findAll({
     where: { followerId: userId },
+    attributes: {
+      exclude: ["followerId", "followingId", "createdAt", "updatedAt"],
+    },
     include: [
       {
         model: require("../../database/models").User,
         as: "following",
-        attributes: ["id", "name", "email"],
+        attributes: ["name"],
       },
     ],
   });

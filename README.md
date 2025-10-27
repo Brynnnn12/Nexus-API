@@ -4,15 +4,67 @@ Nexus API adalah backend RESTful API untuk platform sosial media yang dibangun d
 
 ## 🚀 Fitur
 
-- **Autentikasi JWT**: Register, login, dan delete akun dengan token-based authentication.
-- **Manajemen Profil**: Otomatis dibuat saat register, bisa diupdate.
-- **Posting**: Buat, baca, update, delete posts dengan pagination.
-- **Follow System**: Follow/unfollow users, lihat followers/following.
-- **Like System**: Like/unlike posts, lihat likes per post.
-- **Error Handling**: Middleware error handling yang komprehensif.
-- **Validation**: Input validation menggunakan express-validator.
-- **Pagination**: Pagination untuk posts dan lists.
-- **Security**: Password hashing dengan bcrypt, UUID untuk IDs.
+- **Autentikasi JWT**:
+
+  - Register user baru dengan email dan password
+  - Login dengan email/password menghasilkan JWT token
+  - Delete akun dengan cascade delete ke semua data terkait
+  - Token expiration otomatis (default: 1 jam)
+
+- **Manajemen Profil**:
+
+  - Profile otomatis dibuat saat register dengan display name dari nama user
+  - Update display name dan bio
+  - View profile dengan stats (followers, following, posts count)
+  - Profile public untuk dilihat user lain
+
+- **Posting System**:
+
+  - Buat post dengan konten max 280 karakter
+  - Edit hanya post milik sendiri
+  - Hapus hanya post milik sendiri
+  - View semua posts dengan pagination (10 items per page default)
+  - View posts per user dengan pagination
+  - Konten sensitif (userId) tidak ditampilkan di response
+
+- **Follow System**:
+
+  - Follow/unfollow users
+  - Tidak bisa follow diri sendiri
+  - Check if already following
+  - View followers list dengan nama user
+  - View following list dengan nama user
+  - Get follower/following count stats
+
+- **Like System**:
+
+  - Like/unlike posts
+  - Check if already liked
+  - View likes per post dengan nama user dan konten post
+  - Get total likes count per post
+  - View all likes dari current user
+
+- **Security & Validation**:
+
+  - Password hashing dengan bcryptjs (salt rounds: 10)
+  - JWT token-based authentication
+  - UUID v4 untuk semua IDs
+  - UUID validation di semua endpoints
+  - Authorization check untuk edit/delete operations
+  - Input validation dengan express-validator
+  - Error handling dengan stack trace di development
+
+- **Pagination & Performance**:
+
+  - Posts list pagination (limit: 10 per page default, max: 100)
+  - User posts pagination
+  - Follow list pagination
+  - Efficient queries dengan selective attributes
+
+- **Data Integrity**:
+  - Cascade delete untuk foreign keys
+  - Transaction support untuk multi-table operations
+  - Unique constraints (email, userId di profiles)
 
 ## 🛠️ Tech Stack
 
@@ -165,44 +217,741 @@ npm start
 
 Base URL: `http://localhost:3000/api/v1`
 
-### Authentication
+### Authentication Endpoints
 
-- `POST /auth/register` - Register user baru
-- `POST /auth/login` - Login user
-- `DELETE /auth/me` - Delete akun (butuh auth)
+#### 1. Register User
 
-### Profiles
+```
+POST /auth/register
+```
 
-- `GET /profiles/me` - Get profile sendiri (butuh auth)
-- `GET /profiles/:id` - Get profile user lain (public, dengan stats followers/following/posts) - _id harus UUID, bukan "me"_
-- `PUT /profiles` - Update profile (butuh auth)
+**Request Body:**
 
-### Posts
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "password123",
+  "passwordConfirmation": "password123"
+}
+```
 
-- `GET /posts` - Get all posts (public, paginated)
-- `GET /posts/:id` - Get single post (public)
-- `GET /posts/user/me` - Get posts sendiri (butuh auth, paginated)
-- `POST /posts` - Create post (butuh auth)
-- `PUT /posts/:id` - Update post (butuh auth, owner only)
-- `DELETE /posts/:id` - Delete post (butuh auth, owner only)
+**Success Response (201):**
 
-### Follows
+```json
+{
+  "status": "success",
+  "message": "User registered successfully",
+  "data": {
+    "user": {
+      "id": "3b2ce536-04c1-4bd4-90be-3e49954a76e1",
+      "name": "John Doe",
+      "email": "john@example.com"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
 
-- `POST /follows/:id/follow` - Follow user (butuh auth)
-- `DELETE /follows/:id/unfollow` - Unfollow user (butuh auth)
-- `GET /follows/:id/followers` - Get followers user
-- `GET /follows/:id/following` - Get following user
-- `GET /follows/:id/stats` - Get follow stats
+**Error Response (400):**
 
-### Likes
+- Email already exists
+- Password confirmation doesn't match
+- Missing required fields
 
-- `POST /likes/:id/like` - Like post (butuh auth)
-- `DELETE /likes/:id/unlike` - Unlike post (butuh auth)
-- `GET /likes/:id/likes` - Get likes by post
-- `GET /likes/:id/likes/count` - Get likes count by post
-- `GET /likes/user/me` - Get likes by current user
+---
 
-## 🔧 Scripts NPM
+#### 2. Login User
+
+```
+POST /auth/login
+```
+
+**Request Body:**
+
+```json
+{
+  "email": "john@example.com",
+  "password": "password123"
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Login berhasil",
+  "data": {
+    "user": {
+      "id": "3b2ce536-04c1-4bd4-90be-3e49954a76e1",
+      "name": "John Doe",
+      "email": "john@example.com"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+**Error Response (401):**
+
+- Invalid email or password
+
+---
+
+#### 3. Delete Account
+
+```
+DELETE /auth/me
+Authorization: Bearer <token>
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Account deleted successfully",
+  "data": {
+    "message": "Account deleted successfully"
+  }
+}
+```
+
+**Error Response (401):**
+
+- Unauthorized: No token or token invalid
+
+---
+
+### Profile Endpoints
+
+#### 1. Get Own Profile
+
+```
+GET /profiles/me
+Authorization: Bearer <token>
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Mengambil profile",
+  "data": {
+    "id": "profile-uuid",
+    "displayName": "John Doe",
+    "bio": "Full Stack Developer",
+    "user": {
+      "name": "John Doe"
+    }
+  }
+}
+```
+
+**Error Response (401):**
+
+- Unauthorized: No token
+
+---
+
+#### 2. Get User Profile (Public)
+
+```
+GET /profiles/:id
+```
+
+**Parameters:**
+
+- `id`: User ID (UUID format)
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Mengambil profile user",
+  "data": {
+    "name": "John Doe",
+    "displayName": "johndoe_dev",
+    "bio": "Full Stack Developer passionate about Node.js",
+    "stats": {
+      "followers": 25,
+      "following": 30,
+      "posts": 15
+    }
+  }
+}
+```
+
+**Error Response (404):**
+
+- Profile tidak ditemukan
+
+---
+
+#### 3. Update Profile
+
+```
+PUT /profiles
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+
+```json
+{
+  "displayName": "John Doe Dev",
+  "bio": "Passionate Full Stack Developer"
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Profile diperbarui",
+  "data": {
+    "id": "profile-uuid",
+    "displayName": "John Doe Dev",
+    "bio": "Passionate Full Stack Developer",
+    "user": {
+      "name": "John Doe"
+    }
+  }
+}
+```
+
+**Error Response:**
+
+- 401: Unauthorized
+- 400: Validation failed
+
+---
+
+### Post Endpoints
+
+#### 1. Get All Posts (Paginated)
+
+```
+GET /posts?page=1&limit=10
+```
+
+**Query Parameters:**
+
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 10, max: 100)
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Mengambil semua post",
+  "data": [
+    {
+      "id": "post-uuid",
+      "content": "Ini postingan pertama saya",
+      "createdAt": "2025-10-26T15:23:37.000Z",
+      "user": {
+        "name": "John Doe"
+      }
+    }
+  ],
+  "meta": {
+    "total": 50,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 5
+  }
+}
+```
+
+---
+
+#### 2. Get Single Post
+
+```
+GET /posts/:id
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Mengambil post",
+  "data": {
+    "id": "post-uuid",
+    "content": "Ini postingan pertama saya",
+    "createdAt": "2025-10-26T15:23:37.000Z",
+    "user": {
+      "name": "John Doe"
+    }
+  }
+}
+```
+
+**Error Response (404):**
+
+- Post tidak ditemukan
+
+---
+
+#### 3. Get Own Posts (Paginated)
+
+```
+GET /posts/user/me?page=1&limit=10
+Authorization: Bearer <token>
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Mengambil post dari user",
+  "data": [
+    {
+      "id": "post-uuid",
+      "content": "Postingan saya",
+      "createdAt": "2025-10-26T15:23:37.000Z",
+      "user": {
+        "name": "John Doe"
+      }
+    }
+  ],
+  "meta": {
+    "total": 5,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 1
+  }
+}
+```
+
+---
+
+#### 4. Create Post
+
+```
+POST /posts
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+
+```json
+{
+  "content": "Ini postingan baru saya yang keren!"
+}
+```
+
+**Success Response (201):**
+
+```json
+{
+  "status": "success",
+  "message": "Membuat post",
+  "data": {
+    "id": "post-uuid",
+    "content": "Ini postingan baru saya yang keren!",
+    "createdAt": "2025-10-27T10:00:00.000Z",
+    "user": {
+      "name": "John Doe"
+    }
+  }
+}
+```
+
+**Error Response:**
+
+- 400: Validation failed (content required, max 280 chars)
+- 401: Unauthorized
+
+---
+
+#### 5. Update Post (Owner Only)
+
+```
+PUT /posts/:id
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+
+```json
+{
+  "content": "Konten post yang sudah diupdate"
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Post diperbarui",
+  "data": {
+    "id": "post-uuid",
+    "content": "Konten post yang sudah diupdate",
+    "createdAt": "2025-10-26T15:23:37.000Z",
+    "user": {
+      "name": "John Doe"
+    }
+  }
+}
+```
+
+**Error Response:**
+
+- 403: Tidak diizinkan untuk memperbarui postingan ini (bukan owner)
+- 404: Postingan tidak ditemukan
+- 400: Validation failed
+
+---
+
+#### 6. Delete Post (Owner Only)
+
+```
+DELETE /posts/:id
+Authorization: Bearer <token>
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Post dihapus",
+  "data": {
+    "message": "Post deleted"
+  }
+}
+```
+
+**Error Response:**
+
+- 403: Tidak diizinkan untuk menghapus postingan ini
+- 404: Post not found
+
+---
+
+### Follow Endpoints
+
+#### 1. Follow User
+
+```
+POST /follows/:id/follow
+Authorization: Bearer <token>
+```
+
+**Parameters:**
+
+- `id`: User ID to follow (UUID format)
+
+**Success Response (201):**
+
+```json
+{
+  "status": "success",
+  "message": "Mengikuti user",
+  "data": {
+    "id": "follow-uuid",
+    "followerId": "follower-uuid",
+    "followingId": "following-uuid"
+  }
+}
+```
+
+**Error Response:**
+
+- 400: Sudah mengikuti pengguna ini / Tidak dapat mengikuti diri sendiri
+- 401: Unauthorized
+
+---
+
+#### 2. Unfollow User
+
+```
+DELETE /follows/:id/unfollow
+Authorization: Bearer <token>
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Berhasil berhenti mengikuti user",
+  "data": {
+    "message": "Berhenti mengikuti berhasil"
+  }
+}
+```
+
+**Error Response:**
+
+- 400: Kamu tidak mengikuti pengguna ini
+- 401: Unauthorized
+
+---
+
+#### 3. Get Followers List
+
+```
+GET /follows/:id/followers
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Berhasil mengambil followers",
+  "data": [
+    {
+      "id": "follow-uuid",
+      "follower": {
+        "name": "User 1"
+      }
+    },
+    {
+      "id": "follow-uuid",
+      "follower": {
+        "name": "User 2"
+      }
+    }
+  ]
+}
+```
+
+---
+
+#### 4. Get Following List
+
+```
+GET /follows/:id/following
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Berhasil mengambil following",
+  "data": [
+    {
+      "id": "follow-uuid",
+      "following": {
+        "name": "User A"
+      }
+    }
+  ]
+}
+```
+
+---
+
+#### 5. Get Follow Statistics
+
+```
+GET /follows/:id/stats
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Statistik mengikuti berhasil diambil",
+  "data": {
+    "followersCount": 25,
+    "followingCount": 30
+  }
+}
+```
+
+---
+
+### Like Endpoints
+
+#### 1. Like Post
+
+```
+POST /likes/:id/like
+Authorization: Bearer <token>
+```
+
+**Parameters:**
+
+- `id`: Post ID (UUID format)
+
+**Success Response (201):**
+
+```json
+{
+  "status": "success",
+  "message": "Post di-like",
+  "data": {
+    "id": "like-uuid",
+    "userId": "user-uuid",
+    "postId": "post-uuid"
+  }
+}
+```
+
+**Error Response:**
+
+- 400: Sudah like post ini / Post tidak ditemukan
+- 401: Unauthorized
+
+---
+
+#### 2. Unlike Post
+
+```
+DELETE /likes/:id/unlike
+Authorization: Bearer <token>
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Post di-unlike",
+  "data": {
+    "message": "Unlike post berhasil"
+  }
+}
+```
+
+**Error Response:**
+
+- 400: Kamu tidak like post ini / Post tidak ditemukan
+- 401: Unauthorized
+
+---
+
+#### 3. Get Likes by Post
+
+```
+GET /likes/:id/likes
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Berhasil mengambil likes",
+  "data": [
+    {
+      "id": "like-uuid",
+      "user": {
+        "name": "User 1"
+      },
+      "post": {
+        "content": "Post content"
+      }
+    }
+  ]
+}
+```
+
+---
+
+#### 4. Get Likes Count
+
+```
+GET /likes/:id/likes/count
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Berhasil mengambil total likes",
+  "data": {
+    "likesCount": 15
+  }
+}
+```
+
+---
+
+#### 5. Get User's Likes
+
+```
+GET /likes/user/me
+Authorization: Bearer <token>
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Berhasil mengambil likes user",
+  "data": [
+    {
+      "id": "like-uuid",
+      "post": {
+        "content": "Post content yang aku like"
+      }
+    }
+  ]
+}
+```
+
+**Error Response:**
+
+- 401: Unauthorized
+
+---
+
+## � Architecture Pattern
+
+Backend ini menggunakan **layered architecture** dengan separation of concerns:
+
+```
+Request
+  ↓
+Router (routes/*.route.js)
+  ↓
+Controller (app/controllers/*.controller.js)
+  ├─ Request validation
+  ├─ Call service layer
+  └─ Send response
+  ↓
+Service (app/services/*.service.js)
+  ├─ Business logic
+  ├─ Authorization checks
+  ├─ UUID validation
+  └─ Call repository
+  ↓
+Repository (app/repositories/*.repository.js)
+  ├─ Database queries
+  ├─ Data transformation
+  └─ Return raw/formatted data
+  ↓
+Database (Models)
+```
+
+**Keuntungan pattern ini:**
+
+- ✅ Easy to test (business logic terpisah dari HTTP)
+- ✅ Reusable services (bisa dipanggil dari berbagai controller)
+- ✅ Single responsibility (setiap layer punya satu tanggung jawab)
+- ✅ Easy to maintain (changes terisolasi di satu layer)
+
+---
+
+## �🔧 Scripts NPM
 
 - `npm run dev` - Jalankan development server dengan nodemon
 - `npm run migrate` - Jalankan database migrations
@@ -225,35 +974,106 @@ Base URL: `http://localhost:3000/api/v1`
 
 ## 🧪 Testing API
 
-Gunakan Postman atau tools serupa untuk test API. Pastikan sertakan header `Authorization: Bearer <token>` untuk endpoints yang butuh auth.
+Gunakan Postman, cURL, atau tools serupa untuk test API.
 
-**📖 Setup Postman lengkap**: Lihat file `POSTMAN_SETUP.md` untuk instruksi detail setup environment variables dan scripts.
-**💻 Testing di VS Code**: Lihat file `VS_CODE_TESTING.md` (untuk yang pakai extension)
-**🛠️ Testing Sederhana**: Lihat file `SIMPLE_TESTING.md` (terminal + cURL)
+### Requirements untuk Testing
 
-### Contoh Request:
+- JWT Token dari endpoint `/auth/login`
+- Valid UUID untuk user/post IDs
+- Header `Authorization: Bearer <token>` untuk protected endpoints
+- Header `Content-Type: application/json` untuk POST/PUT requests
 
-````bash
-# Register
+### Quick Start Testing
+
+1. **Register user baru:**
+
+```bash
 curl -X POST http://localhost:3000/api/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"John Doe","email":"john@example.com","password":"password123","passwordConfirmation":"password123"}'
+  -d '{
+    "name":"John Doe",
+    "email":"john@example.com",
+    "password":"password123",
+    "passwordConfirmation":"password123"
+  }'
+```
 
-# Login
+2. **Login dan dapatkan token:**
+
+```bash
 curl -X POST http://localhost:3000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"john@example.com","password":"password123"}'
+  -d '{
+    "email":"john@example.com",
+    "password":"password123"
+  }'
+```
 
-# Get posts (dengan token)
-curl -X GET http://localhost:3000/api/v1/posts \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+3. **Get own profile (dengan token):**
 
-# Get profile user lain (public)
-curl -X GET http://localhost:3000/api/v1/profiles/USER_ID_HERE
+```bash
+curl -X GET http://localhost:3000/api/v1/profiles/me \
+  -H "Authorization: Bearer <YOUR_JWT_TOKEN>"
+```
+
+4. **Create post (dengan token):**
+
+```bash
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <YOUR_JWT_TOKEN>" \
+  -d '{
+    "content":"Ini postingan pertama saya!"
+  }'
+```
+
+5. **Get all posts (public, tanpa token):**
+
+```bash
+curl -X GET "http://localhost:3000/api/v1/posts?page=1&limit=10"
+```
+
+### Testing dengan Postman
+
+1. Download Postman dari https://www.postman.com/downloads/
+2. Import collection atau setup manually:
+   - Set base URL: `{{base_url}}/api/v1` atau `http://localhost:3000/api/v1`
+   - Buat environment variable untuk `jwt_token` dari response login
+   - Gunakan `Authorization` header type `Bearer Token` dengan `{{jwt_token}}`
+
+### Testing dengan VS Code Extensions
+
+1. Install `REST Client` extension (Huachao Mao)
+2. Buat file `.http` atau `.rest`:
+
+```http
+### Register
+POST http://localhost:3000/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "password123",
+  "passwordConfirmation": "password123"
+}
+
+### Login
+POST http://localhost:3000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "password123"
+}
+```
+
+---
 
 ## 📋 Contoh Response
 
 ### Profile User Lain
+
 ```json
 {
   "success": true,
@@ -269,9 +1089,149 @@ curl -X GET http://localhost:3000/api/v1/profiles/USER_ID_HERE
     }
   }
 }
-````
-
 ```
+
+### Error Response Example
+
+```json
+{
+  "status": "error",
+  "message": "Unauthorized: Tidak ada token",
+  "error": "Unauthorized: Tidak ada token"
+}
+```
+
+### Validation Error Response
+
+```json
+{
+  "status": "error",
+  "message": "Validasi gagal",
+  "error": [
+    {
+      "type": "field",
+      "value": "",
+      "msg": "Content is required",
+      "path": "content",
+      "location": "body"
+    }
+  ]
+}
+```
+
+---
+
+## 🔐 Security Features
+
+### Password Security
+
+- **Hashing**: Bcryptjs dengan salt rounds 10
+- **Never stored plain**: Password di-hash sebelum disimpan ke database
+- **Password confirmation**: Validasi saat register
+
+### Authentication & Authorization
+
+- **JWT Token**: Access token dengan expiration time (default: 1 jam)
+- **Bearer Token**: Token dikirim via `Authorization: Bearer <token>` header
+- **Token Validation**: Setiap request ke protected endpoint diverifikasi
+- **Owner-only Operations**: Update/delete post hanya bisa dilakukan owner
+
+### Data Validation
+
+- **UUID Format**: Semua IDs harus valid UUID v4
+- **Content Length**: Post content max 280 karakter
+- **Email Format**: Validasi email saat register/login
+- **Input Sanitization**: express-validator mengecek semua input
+
+### Data Protection
+
+- **Sensitive Fields Hidden**: userId tidak ditampilkan di response
+- **Selective Attributes**: Query hanya ambil field yang diperlukan
+- **Cascade Delete**: Saat user dihapus, semua data terkait juga dihapus
+
+---
+
+## ⚠️ Error Handling
+
+Semua error response mengikuti format:
+
+```json
+{
+  "status": "error",
+  "message": "User-friendly message",
+  "error": "Detailed error atau stack trace di development"
+}
+```
+
+### Common HTTP Status Codes
+
+| Code | Meaning      | Example                               |
+| ---- | ------------ | ------------------------------------- |
+| 400  | Bad Request  | Validation failed, already following  |
+| 401  | Unauthorized | Missing/invalid token, wrong password |
+| 403  | Forbidden    | Not owner of post, can't follow self  |
+| 404  | Not Found    | User/post/profile tidak ditemukan     |
+| 500  | Server Error | Database error, unexpected exception  |
+
+### Common Error Messages
+
+- `"Unauthorized: Tidak ada token"` - Missing authorization header
+- `"Unauthorized: token tidak valid"` - Invalid JWT token
+- `"Unauthorized: Token expired"` - Token sudah expired
+- `"ID post tidak valid"` - Post ID bukan valid UUID
+- `"ID user tidak valid"` - User ID bukan valid UUID
+- `"Tidak dapat mengikuti diri sendiri"` - Trying to follow self
+- `"Kamu sudah mengikuti pengguna ini"` - Already following
+- `"Tidak diizinkan untuk memperbarui postingan ini"` - Not owner of post
+
+---
+
+## 🚀 Performance Considerations
+
+### Query Optimization
+
+- Selective attributes: Query hanya field yang dibutuhkan
+- Eager loading: Include related models dalam single query
+- Pagination: Limit hasil untuk large datasets
+- Indexing: Database indexes pada foreign keys dan frequently queried columns
+
+### Response Optimization
+
+- Remove sensitive fields: userId hidden dari response
+- Minimal data: Tidak kirim semua fields ke client
+- Pagination metadata: Total, current page, total pages
+
+### Caching Opportunities (Future)
+
+- Cache user profiles (1 jam)
+- Cache follow stats (5 menit)
+- Cache popular posts (30 menit)
+
+---
+
+## 📝 Validation Rules
+
+### Registration
+
+- `name`: Required, string
+- `email`: Required, valid email, unique
+- `password`: Required, min 6 characters
+- `passwordConfirmation`: Required, must match password
+
+### Post Creation
+
+- `content`: Required, string, max 280 characters
+
+### Profile Update
+
+- `displayName`: Optional, string, max 100 characters
+- `bio`: Optional, string, max 160 characters
+
+### Follow/Like Operations
+
+- `id`: Required, valid UUID v4 format
+
+---
 
 ## 🤝 Contributing
 
@@ -290,7 +1250,121 @@ Distributed under the ISC License. See `LICENSE` for more information.
 - Project Link: [GitHub Repository]
 - Email: your-email@example.com
 
+### Response Format
+
+**Success Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Deskripsi operasi",
+  "data": {
+    /* response data */
+  }
+}
+```
+
+**Paginated Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Deskripsi operasi",
+  "data": [
+    /* array of items */
+  ],
+  "meta": {
+    "total": 50,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 5
+  }
+}
+```
+
+**Error Response:**
+
+```json
+{
+  "status": "error",
+  "message": "User-friendly message",
+  "error": "Detail error atau stack trace (development mode)"
+}
+```
+
+### Data Types & Constraints
+
+| Field | Type   | Constraints                        |
+| ----- | ------ | ---------------------------------- |
+| id    | UUID   | v4 format, auto-generated          |
+| email | String | Valid email, unique, max 255 chars |
+
+### Data Types & Constraints
+
+| Field       | Type      | Constraints                        |
+| ----------- | --------- | ---------------------------------- |
+| id          | UUID      | v4 format, auto-generated          |
+| email       | String    | Valid email, unique, max 255 chars |
+| password    | String    | Hashed with bcryptjs, min 6 chars  |
+| name        | String    | Required, max 255 chars            |
+| displayName | String    | Optional, max 100 chars            |
+| bio         | String    | Optional, max 160 chars            |
+| content     | String    | Max 280 chars (like Twitter)       |
+| createdAt   | Timestamp | Auto-generated                     |
+| updatedAt   | Timestamp | Auto-updated                       |
+
 ---
 
-**Catatan**: Pastikan semua dependencies terinstall dan database sudah setup sebelum menjalankan aplikasi. Untuk production, pastikan `NODE_ENV=production` dan gunakan HTTPS.
+## ⚠️ Important Notes
+
+- ✅ **Pastikan semua dependencies terinstall**: `npm install`
+- ✅ **Database harus sudah di-setup**: Create database dan run migrations
+- ✅ **Environment variables harus di-set**: Copy `.env.example` ke `.env` dan isi values
+- ✅ **JWT Secret harus strong**: Gunakan string random yang panjang
+- ✅ **ID di URL harus UUID**: Jangan gunakan format "me" kecuali di endpoint spesifik `/profiles/me` atau `/posts/user/me`
+- ⚠️ **Production mode**: Set `NODE_ENV=production`, gunakan HTTPS, dan hide error stack traces
+- ⚠️ **Rate limiting**: Pertimbangkan implementasi rate limiting untuk production
+- ⚠️ **CORS**: Konfigurasi CORS sesuai domain frontend
+
+---
+
+## 📞 Troubleshooting
+
+### Server tidak jalan (Exit Code: 1)
+
+```bash
+# Check error log
+npm run dev
+
+# Pastikan dependencies installed
+npm install
+
+# Pastikan database running
+mysql -u root -p
+
+# Pastikan .env exists dan valid
+cat .env
 ```
+
+### Database connection error
+
+- Pastikan MySQL service running
+- Check DB credentials di `.env`
+- Check database sudah di-create: `SHOW DATABASES;`
+
+### Invalid UUID error
+
+- Pastikan ID adalah valid UUID v4 format
+- Format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- Jangan gunakan custom IDs atau strings
+
+### Token expired error
+
+- Refresh login untuk mendapatkan token baru
+- JWT_EXPIRES_IN di `.env` menentukan durasi token
+
+---
+
+**Catatan**: Dokumentasi ini sesuai dengan kode yang ada. Untuk production, pastikan semua security best practices diterapkan.
+
+---

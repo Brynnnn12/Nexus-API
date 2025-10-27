@@ -55,7 +55,7 @@ exports.register = async (userData) => {
     // Generate token
     const token = generateAccessToken({ id: user.id, email: user.email });
 
-    return { user: { id: user.id, name: user.name, email: user.email }, token };
+    return { user: { name: user.name }, token };
   } catch (error) {
     // Rollback jika ada error
     await transaction.rollback();
@@ -87,7 +87,7 @@ exports.login = async (credentials) => {
   // Generate token
   const token = generateAccessToken({ id: user.id, email: user.email });
 
-  return { user: { id: user.id, name: user.name, email: user.email }, token };
+  return { user: { name: user.name }, token };
 };
 
 /**
